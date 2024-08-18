@@ -1,68 +1,57 @@
-name: Build Ubuntu ISO
+name: Build Custom Distro
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up build environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git squashfs-tools grub-pc-bin xorriso debootstrap
+    - name: Set up Build Environment
+      run: |
+        sudo apt update
+        sudo apt install -y debootstrap mkisofs
 
-      - name: Create root filesystem
-        run: |
-          mkdir -p ~/ubuntu_root
-          sudo debootstrap --arch=amd64 focal ~/ubuntu_root http://archive.ubuntu.com/ubuntu/
+    - name: Bootstrap the Base System
+      run: |
+        mkdir -p $HOME/custom-distro/rootfs
+        sudo debootstrap --variant=buildd --arch=amd64 focal $HOME/custom-distro/rootfs http://archive.ubuntu.com/ubuntu/
 
-      - name: Configure and install packages
-        run: |
-          sudo mount --bind /dev ~/ubuntu_root/dev
-          sudo mount --bind /proc ~/ubuntu_root/proc
-          sudo mount --bind /sys ~/ubuntu_root/sys
-          sudo chroot ~/ubuntu_root /bin/bash -c "apt-get update && apt-get install -y grub-pc-bin grub-efi-amd64"
-          sudo chroot ~/ubuntu_root /bin/bash -c "update-grub"
-          sudo umount ~/ubuntu_root/dev
-          sudo umount ~/ubuntu_root/proc
-          sudo umount ~/ubuntu_root/sys
+    - name: Chroot and Customize System
+      run: |
+        sudo mount --bind /proc $HOME/custom-distro/rootfs/proc
+        sudo mount --bind /sys $HOME/custom-distro/rootfs/sys
+        sudo mount --bind /dev $HOME/custom-distro/rootfs/dev
+        sudo mount --bind /dev/pts $HOME/custom-distro/rootfs/dev/pts
+        sudo chroot $HOME/custom-distro/rootfs /bin/bash <<EOF
+        apt update
+        apt install -y xorg fluxbox xterm
+        echo '#!/bin/sh' > /root/hello-world.sh
+        echo 'xterm -bg white -fg black -e "echo Hello, World!; read -p \"Press Enter to exit...\"" &' >> /root/hello-world.sh
+        echo 'exec fluxbox' >> /root/.fluxbox/startup
+        chmod +x /root/hello-world.sh
+        chmod +x /root/.fluxbox/startup
+        EOF
 
-      - name: Build SquashFS image
-        run: |
-          mksquashfs ~/ubuntu_root ~/ubuntu_root.squashfs -e boot
+    - name: Unmount Filesystems
+      run: |
+        sudo umount $HOME/custom-distro/rootfs/proc
+        sudo umount $HOME/custom-distro/rootfs/sys
+        sudo umount $HOME/custom-distro/rootfs/dev/pts
+        sudo umount $HOME/custom-distro/rootfs/dev
 
-      - name: Prepare ISO directory
-        run: |
-          mkdir -p ~/iso/boot/grub
-          cp -r /usr/lib/grub/x86_64-efi/* ~/iso/boot/grub/
-          cp ~/ubuntu_root.squashfs ~/iso/
+    - name: Create ISO Image
+      run: |
+        sudo mkisofs -o $HOME/custom-distro.iso -b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table $HOME/custom-distro
 
-
-
-      - name: Build ISO
-        run: |
-          xorriso -as mkisofs \
-            -r -V 'Custom Ubuntu ISO' \
-            -o ~/ubuntu_custom.iso \
-            -b boot/grub/i386-pc/eltorito.img \
-            -c boot.catalog \
-            -no-emul-boot \
-            -boot-load-size 4 \
-            -boot-info-table \
-            ~/iso
-
-
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ubuntu-custom-iso
-          path: ~/ubuntu_custom.iso
+    - name: Upload ISO as artifact
+      uses: actions/upload-artifact@v3
+      with:
+           name: custom-distro-iso
+           path: $HOME/custom-distro.iso
