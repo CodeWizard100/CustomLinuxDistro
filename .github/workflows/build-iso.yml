@@ -1,0 +1,21 @@
+name: Build Alpine ISO
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Alpine environment
+        uses: docker://alpine:latest
+        run: |
+          apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas
+          apk --version
