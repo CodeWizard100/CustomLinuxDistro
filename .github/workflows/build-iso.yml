@@ -98,8 +98,11 @@ jobs:
         cd $HOME/live-ubuntu-from-scratch
         mkdir -p image/{casper,isolinux,install}
 
-        sudo cp chroot/boot/vmlinuz-**-**-generic image/casper/vmlinuz
-        sudo cp chroot/boot/initrd.img-**-**-generic image/casper/initrd
+        KERNEL_VERSION=$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
+        INITRD_VERSION=$(ls chroot/boot | grep -Eo 'initrd.img-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
+
+        sudo cp "chroot/boot/${KERNEL_VERSION}" image/casper/vmlinuz
+        sudo cp "chroot/boot/${INITRD_VERSION}" image/casper/initrd
 
         sudo cp chroot/boot/memtest86+.bin image/install/memtest86+
 
@@ -169,15 +172,17 @@ jobs:
         MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std
         MENU COLOR msg07        37;40   #90ffffff #a0000000 std
         MENU COLOR tabmsg       31;40   #30ffffff #00000000 std
+
         LABEL linux
-          MENU LABEL Try Ubuntu FS
-          MENU DEFAULT
-          KERNEL /casper/vmlinuz
-          APPEND initrd=/casper/initrd boot=casper
+         MENU LABEL Try Ubuntu FS
+         MENU DEFAULT
+         KERNEL /casper/vmlinuz
+         APPEND initrd=/casper/initrd boot=casper
+
         LABEL linux
-          MENU LABEL Try Ubuntu FS (nomodeset)
-          KERNEL /casper/vmlinuz
-          APPEND initrd=/casper/initrd boot=casper nomodeset
+         MENU LABEL Try Ubuntu FS (nomodeset)
+         KERNEL /casper/vmlinuz
+         APPEND initrd=/casper/initrd boot=casper nomodeset
         EOF
 
     - name: Build ISO Image
