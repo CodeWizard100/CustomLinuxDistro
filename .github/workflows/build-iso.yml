@@ -20,21 +20,21 @@ jobs:
           docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
             apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git gnupg &&
             for i in {1..5}; do git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && break || sleep 15; done &&
-            # Generate GPG key
+            # Generate GPG key with proper formatting
             gpg --batch --gen-key <<EOF
+              %no-protection
               Key-Type: RSA
               Key-Length: 2048
               Name-Real: Your Name
               Name-Email: your.email@example.com
               Expire-Date: 0
-              %no-protection
               %commit
-            EOF
+              EOF
             # Export the public key
             gpg --armor --export your.email@example.com > /workspace/public.key
             # Export the private key
             gpg --armor --export-secret-keys your.email@example.com > /workspace/private.key
-            # Import the key (if needed for signing)
+            # Import the private key (if needed for signing)
             gpg --import /workspace/private.key
             # Run the build script
             chmod +x install.sh &&
