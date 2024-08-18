@@ -55,12 +55,12 @@ jobs:
     - name: Prepare Bootloader Files
       run: |
         mkdir -p $HOME/custom-distro/isolinux
-        sudo cp /usr/lib/syslinux/isolinux.bin $HOME/custom-distro/isolinux/
-        sudo cp /usr/lib/syslinux/isolinux.cfg $HOME/custom-distro/isolinux/
+        sudo cp /usr/lib/ISOLINUX/isolinux.bin $HOME/custom-distro/isolinux/
+        sudo cp /usr/lib/ISOLINUX/isolinux.cfg $HOME/custom-distro/isolinux/
 
     - name: Create ISO Image
       run: |
-        sudo mkisofs -o $HOME/custom-distro.iso -b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table $HOME/custom-distro
+        sudo mkisofs -o $HOME/custom-distro.iso -b isolinux/isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table $HOME/custom-distro
 
     - name: Upload ISO as artifact
       uses: actions/upload-artifact@v3
