@@ -18,13 +18,36 @@ jobs:
         run: |
           # Pull Alpine image and run build steps inside a container
           docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
-            apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git &&
+            apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git gnupg &&
             for i in {1..5}; do git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && break || sleep 15; done &&
+            # Generate GPG key
+            gpg --batch --gen-key <<EOF
+              Key-Type: RSA
+              Key-Length: 2048
+              Name-Real: Your Name
+              Name-Email: your.email@example.com
+              Expire-Date: 0
+              %no-protection
+              %commit
+            EOF
+            # Export the public key
+            gpg --armor --export your.email@example.com > /workspace/public.key
+            # Export the private key
+            gpg --armor --export-secret-keys your.email@example.com > /workspace/private.key
+            # Import the key (if needed for signing)
+            gpg --import /workspace/private.key
+            # Run the build script
             chmod +x install.sh &&
-            # Disable signing if not required
-            sed -i 's|SIGN_KEY=.*|SIGN_KEY=""|' install.sh &&
             ./install.sh
           "
+
+      - name: Upload GPG keys
+        uses: actions/upload-artifact@v3
+        with:
+          name: gpg-keys
+          path: |
+            public.key
+            private.key
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v3
