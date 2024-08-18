@@ -93,10 +93,17 @@ jobs:
         sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/dev
         sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/run
 
-    - name: Create ISO Structure
+      - name: Create ISO Structure
       run: |
         cd $HOME/live-ubuntu-from-scratch
         mkdir -p image/{casper,isolinux,install}
+
+        # Debugging: Check contents of /boot and installed kernels
+        echo "Listing contents of /boot in chroot:"
+        ls -la $HOME/live-ubuntu-from-scratch/chroot/boot
+
+        echo "Checking installed kernel versions in chroot:"
+        sudo chroot $HOME/live-ubuntu-from-scratch/chroot dpkg -l | grep linux-image
 
         # Check for kernel and initrd files
         if [ ! "$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')" ]; then
