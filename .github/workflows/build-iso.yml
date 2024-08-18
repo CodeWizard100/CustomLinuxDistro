@@ -90,8 +90,8 @@ jobs:
           exit
         "
 
-        sudo umount $HOME/live-ubuntu-from-scratch/chroot/dev
-        sudo umount $HOME/live-ubuntu-from-scratch/chroot/run
+        sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/dev
+        sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/run
 
     - name: Create ISO Structure
       run: |
@@ -180,30 +180,10 @@ jobs:
           APPEND initrd=/casper/initrd boot=casper nomodeset
         EOF
 
-        cp /usr/lib/ISOLINUX/isolinux.bin image/isolinux/
-        cp /usr/lib/syslinux/modules/bios/* image/isolinux/
-
     - name: Build ISO Image
       run: |
         cd $HOME/live-ubuntu-from-scratch
-        sudo xorriso \
-          -as mkisofs \
-          -iso-level 3 \
-          -full-iso9660-filenames \
-          -volid "UBUNTU_FS" \
-          -output ubuntu-fs.iso \
-          -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-          -eltorito-boot isolinux/isolinux.bin \
-          -eltorito-catalog isolinux/boot.cat \
-          -no-emul-boot \
-          -boot-load-size 4 \
-          -boot-info-table \
-          -eltorito-alt-boot \
-          -e boot/grub/efi.img \
-          -no-emul-boot \
-          -isohybrid-gpt-basdat \
-          -append_partition 2 0xef image/efi.img \
-          image
+        sudo xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "UBUNTU_FS" -output ubuntu-fs.iso -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -eltorito-boot isolinux/isolinux.bin -eltorito-catalog isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -append_partition 2 0xef image/efi.img image
 
     - name: Upload ISO Artifact
       uses: actions/upload-artifact@v3
