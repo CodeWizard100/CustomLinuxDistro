@@ -46,6 +46,7 @@ jobs:
           cp ~/ubuntu_root.squashfs ~/iso/
 
 
+
       - name: Build ISO
         run: |
           xorriso -as mkisofs \
@@ -57,6 +58,8 @@ jobs:
             -boot-load-size 4 \
             -boot-info-table \
             ~/iso
+
+
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v3
