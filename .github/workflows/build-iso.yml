@@ -20,5 +20,5 @@ jobs:
           docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
             apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git &&
             for i in {1..5}; do git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && break || sleep 15; done &&
-            cd aports && cd scripts && chmod +x mkimg.standard.sh && ./mkimg.standard.sh && cat mkimg.standard.sh && ls
+            chmod +x install.sh && ./install.sh
           "
