@@ -1,4 +1,4 @@
-name: Build Alpine ISO
+name: Build Ubuntu ISO
 
 on:
   push:
@@ -12,45 +12,53 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Set up Alpine environment
+      - name: Set up build environment
         run: |
-          # Pull Alpine image and run build steps inside a container
-          docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
-            apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git gnupg &&
-            for i in {1..5}; do git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && break || sleep 15; done &&
-            # Generate GPG key with proper formatting
-            gpg --batch --gen-key <<EOF
-              %no-protection
-              Key-Type: RSA
-              Key-Length: 2048
-              Name-Real: Your Name
-              Name-Email: your.email@example.com
-              Expire-Date: 0
-              %commit
-              EOF
-            # Export the public key
-            gpg --armor --export your.email@example.com > /workspace/public.key
-            # Export the private key
-            gpg --armor --export-secret-keys your.email@example.com > /workspace/private.key
-            # Import the private key (if needed for signing)
-            gpg --import /workspace/private.key
-            # Run the build script
-            chmod +x install.sh &&
-            ./install.sh
-          "
+          sudo apt-get update
+          sudo apt-get install -y build-essential git squashfs-tools grub-pc-bin xorriso debootstrap
 
-      - name: Upload GPG keys
-        uses: actions/upload-artifact@v3
-        with:
-          name: gpg-keys
-          path: |
-            public.key
-            private.key
+      - name: Create root filesystem
+        run: |
+          mkdir -p ~/ubuntu_root
+          sudo debootstrap --arch=amd64 focal ~/ubuntu_root http://archive.ubuntu.com/ubuntu/
+
+      - name: Configure and install packages
+        run: |
+          sudo mount --bind /dev ~/ubuntu_root/dev
+          sudo mount --bind /proc ~/ubuntu_root/proc
+          sudo mount --bind /sys ~/ubuntu_root/sys
+          sudo chroot ~/ubuntu_root /bin/bash -c "apt-get update && apt-get install -y grub-pc-bin grub-efi-amd64"
+          sudo chroot ~/ubuntu_root /bin/bash -c "update-grub"
+          sudo umount ~/ubuntu_root/dev
+          sudo umount ~/ubuntu_root/proc
+          sudo umount ~/ubuntu_root/sys
+
+      - name: Build SquashFS image
+        run: |
+          mksquashfs ~/ubuntu_root ~/ubuntu_root.squashfs -e boot
+
+      - name: Prepare ISO directory
+        run: |
+          mkdir -p ~/iso/boot/grub
+          cp /usr/lib/grub/x86_64-efi/* ~/iso/boot/grub/
+          cp ~/ubuntu_root.squashfs ~/iso/
+
+      - name: Build ISO
+        run: |
+          xorriso -as mkisofs \
+            -r -V 'Custom Ubuntu ISO' \
+            -o ~/ubuntu_custom.iso \
+            -b boot/grub/i386-pc/eltorito.img \
+            -c boot.catalog \
+            -no-emul-boot \
+            -boot-load-size 4 \
+            -boot-info-table \
+            ~/iso
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v3
         with:
-          name: alpine-iso
-          path: ~/iso/*.iso
+          name: ubuntu-custom-iso
+          path: ~/ubuntu_custom.iso
