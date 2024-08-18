@@ -20,5 +20,14 @@ jobs:
           docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
             apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git &&
             for i in {1..5}; do git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && break || sleep 15; done &&
-            chmod +x install.sh && ./install.sh
+            chmod +x install.sh &&
+            # Disable signing if not required
+            sed -i 's|SIGN_KEY=.*|SIGN_KEY=""|' install.sh &&
+            ./install.sh
           "
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: alpine-iso
+          path: ~/iso/*.iso
