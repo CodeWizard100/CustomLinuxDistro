@@ -18,6 +18,6 @@ jobs:
         run: |
           # Pull Alpine image and run build steps inside a container
           docker run --rm -v $(pwd):/workspace -w /workspace alpine:latest /bin/sh -c "
-            apk --version
+            apk --version && apk add alpine-sdk alpine-conf syslinux xorriso squashfs-tools grub grub-efi doas git && git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git && cd aports && ls
           "
 
