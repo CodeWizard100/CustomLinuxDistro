@@ -16,213 +16,197 @@ jobs:
     - name: Set up Build Environment
       run: |
         mkdir $HOME/live-ubuntu-from-scratch
-        sudo apt-get install \
-        binutils \
-        debootstrap \
-        squashfs-tools \
-        xorriso \
-        grub-pc-bin \
-        grub-efi-amd64-bin \
-        mtools
-
-     
+        sudo apt-get update
+        sudo apt-get install -y \
+          binutils \
+          debootstrap \
+          squashfs-tools \
+          xorriso \
+          grub-pc-bin \
+          grub-efi-amd64-bin \
+          mtools \
+          syslinux-common
 
     - name: Bootstrap the Base System
-  run: |
-    sudo debootstrap \
-      --arch=amd64 \
-      --variant=minbase \
-      focal \
-      $HOME/live-ubuntu-from-scratch/chroot \
-      http://us.archive.ubuntu.com/ubuntu/
+      run: |
+        sudo debootstrap \
+          --arch=amd64 \
+          --variant=minbase \
+          focal \
+          $HOME/live-ubuntu-from-scratch/chroot \
+          http://us.archive.ubuntu.com/ubuntu/
 
-    sudo mount --bind /dev $HOME/live-ubuntu-from-scratch/chroot/dev
-    sudo mount --bind /run $HOME/live-ubuntu-from-scratch/chroot/run
-    sudo mount none -t proc $HOME/live-ubuntu-from-scratch/chroot/proc
-    sudo mount none -t sysfs $HOME/live-ubuntu-from-scratch/chroot/sys
-    sudo mount none -t devpts $HOME/live-ubuntu-from-scratch/chroot/dev/pts
-    
-    sudo chroot $HOME/live-ubuntu-from-scratch/chroot /bin/bash -c "
-      export HOME=/root
-      export LC_ALL=C
-      echo 'ubuntu-fs-live' > /etc/hostname
-      cat <<EOF > /etc/apt/sources.list
-      deb http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
-      deb-src http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
-      deb http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
-      deb-src http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
-      deb http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
-      deb-src http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
-      EOF
-      apt-get update
-      apt-get install -y libterm-readline-gnu-perl systemd-sysv
-      dbus-uuidgen > /etc/machine-id
-      ln -fs /etc/machine-id /var/lib/dbus/machine-id
-      dpkg-divert --local --rename --add /sbin/initctl
-      ln -s /bin/true /sbin/initctl
-      apt-get -y upgrade
-      apt-get install -y sudo ubuntu-standard casper lupin-casper discover laptop-detect os-prober network-manager resolvconf net-tools wireless-tools wpagui locales grub-common grub-gfxpayload-lists grub-pc grub-pc-bin grub2-common
-      apt-get install -y --no-install-recommends linux-generic
-      apt-get install -y ubiquity ubiquity-casper ubiquity-frontend-gtk ubiquity-slideshow-ubuntu ubiquity-ubuntu-artwork
-      apt-get install -y plymouth-theme-ubuntu-logo ubuntu-gnome-desktop ubuntu-gnome-wallpapers
-      apt-get install -y clamav-daemon terminator apt-transport-https curl vim nano less
-      apt-get purge -y transmission-gtk transmission-common gnome-mahjongg gnome-mines gnome-sudoku aisleriot hitori
-      apt-get autoremove -y
-      dpkg-reconfigure locales
-      dpkg-reconfigure resolvconf
-      cat <<EOF > /etc/NetworkManager/NetworkManager.conf
-      [main]
-      rc-manager=resolvconf
-      plugins=ifupdown,keyfile
-      dns=dnsmasq
-      [ifupdown]
-      managed=false
-      EOF
-      dpkg-reconfigure network-manager
-      truncate -s 0 /etc/machine-id
-      rm /sbin/initctl
-      dpkg-divert --rename --remove /sbin/initctl
-      apt-get clean
-      rm -rf /tmp/* ~/.bash_history
-      umount /proc
-      umount /sys
-      umount /dev/pts
-      exit
-    "
+        sudo mount --bind /dev $HOME/live-ubuntu-from-scratch/chroot/dev
+        sudo mount --bind /run $HOME/live-ubuntu-from-scratch/chroot/run
+        sudo mount none -t proc $HOME/live-ubuntu-from-scratch/chroot/proc
+        sudo mount none -t sysfs $HOME/live-ubuntu-from-scratch/chroot/sys
+        sudo mount none -t devpts $HOME/live-ubuntu-from-scratch/chroot/dev/pts
+        
+        sudo chroot $HOME/live-ubuntu-from-scratch/chroot /bin/bash -c "
+          export HOME=/root
+          export LC_ALL=C
+          echo 'ubuntu-fs-live' > /etc/hostname
+          cat <<EOF > /etc/apt/sources.list
+          deb http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
+          deb-src http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
+          deb http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
+          deb-src http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
+          deb http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
+          deb-src http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
+          EOF
+          apt-get update
+          apt-get install -y libterm-readline-gnu-perl systemd-sysv
+          dbus-uuidgen > /etc/machine-id
+          ln -fs /etc/machine-id /var/lib/dbus/machine-id
+          dpkg-divert --local --rename --add /sbin/initctl
+          ln -s /bin/true /sbin/initctl
+          apt-get -y upgrade
+          apt-get install -y sudo ubuntu-standard casper lupin-casper discover laptop-detect os-prober network-manager resolvconf net-tools wireless-tools wpagui locales grub-common grub-gfxpayload-lists grub-pc grub-pc-bin grub2-common
+          apt-get install -y --no-install-recommends linux-generic
+          apt-get install -y ubiquity ubiquity-casper ubiquity-frontend-gtk ubiquity-slideshow-ubuntu ubiquity-ubuntu-artwork
+          apt-get install -y plymouth-theme-ubuntu-logo ubuntu-gnome-desktop ubuntu-gnome-wallpapers
+          apt-get install -y clamav-daemon terminator apt-transport-https curl vim nano less
+          apt-get purge -y transmission-gtk transmission-common gnome-mahjongg gnome-mines gnome-sudoku aisleriot hitori
+          apt-get autoremove -y
+          dpkg-reconfigure locales
+          dpkg-reconfigure resolvconf
+          cat <<EOF > /etc/NetworkManager/NetworkManager.conf
+          [main]
+          rc-manager=resolvconf
+          plugins=ifupdown,keyfile
+          dns=dnsmasq
+          [ifupdown]
+          managed=false
+          EOF
+          dpkg-reconfigure network-manager
+          truncate -s 0 /etc/machine-id
+          rm /sbin/initctl
+          dpkg-divert --rename --remove /sbin/initctl
+          apt-get clean
+          rm -rf /tmp/* ~/.bash_history
+          umount /proc
+          umount /sys
+          umount /dev/pts
+          exit
+        "
 
-    sudo umount $HOME/live-ubuntu-from-scratch/chroot/dev
-    sudo umount $HOME/live-ubuntu-from-scratch/chroot/run
+        sudo umount $HOME/live-ubuntu-from-scratch/chroot/dev
+        sudo umount $HOME/live-ubuntu-from-scratch/chroot/run
 
+    - name: Create ISO Structure
+      run: |
+        cd $HOME/live-ubuntu-from-scratch
+        mkdir -p image/{casper,isolinux,install}
 
-                cd $HOME/live-ubuntu-from-scratch
+        sudo cp chroot/boot/vmlinuz-**-**-generic image/casper/vmlinuz
+        sudo cp chroot/boot/initrd.img-**-**-generic image/casper/initrd
 
-                mkdir -p image/{casper,isolinux,install}
+        sudo cp chroot/boot/memtest86+.bin image/install/memtest86+
 
-                sudo cp chroot/boot/vmlinuz-**-**-generic image/casper/vmlinuz
+        wget --progress=dot https://www.memtest86.com/downloads/memtest86-usb.zip -O image/install/memtest86-usb.zip
+        unzip -p image/install/memtest86-usb.zip memtest86-usb.img > image/install/memtest86
+        rm -f image/install/memtest86-usb.zip
 
-                sudo cp chroot/boot/initrd.img-**-**-generic image/casper/initrd
+    - name: Configure GRUB
+      run: |
+        cd $HOME/live-ubuntu-from-scratch
+        touch image/ubuntu
+        cat <<EOF > image/isolinux/grub.cfg
+        search --set=root --file /ubuntu
+        insmod all_video
+        set default="0"
+        set timeout=30
+        menuentry "Try Ubuntu FS without installing" {
+          linux /casper/vmlinuz boot=casper nopersistent toram quiet splash ---
+          initrd /casper/initrd
+        }
+        menuentry "Install Ubuntu FS" {
+          linux /casper/vmlinuz boot=casper only-ubiquity quiet splash ---
+          initrd /casper/initrd
+        }
+        menuentry "Check disc for defects" {
+          linux /casper/vmlinuz boot=casper integrity-check quiet splash ---
+          initrd /casper/initrd
+        }
+        menuentry "Test memory Memtest86+ (BIOS)" {
+          linux16 /install/memtest86+
+        }
+        menuentry "Test memory Memtest86 (UEFI, long load time)" {
+          insmod part_gpt
+          insmod search_fs_uuid
+          insmod chain
+          loopback loop /install/memtest86
+          chainloader (loop,gpt1)/efi/boot/BOOTX64.efi
+        }
+        EOF
 
-                sudo cp chroot/boot/memtest86+.bin image/install/memtest86+
+    - name: Generate Manifest
+      run: |
+        cd $HOME/live-ubuntu-from-scratch
+        sudo chroot chroot dpkg-query -W --showformat='${Package} ${Version}\n' | sudo tee image/casper/filesystem.manifest
+        sudo cp -v image/casper/filesystem.manifest image/casper/filesystem.manifest-desktop
+        sudo sed -i '/ubiquity/d' image/casper/filesystem.manifest-desktop
+        sudo sed -i '/casper/d' image/casper/filesystem.manifest-desktop
+        sudo sed -i '/discover/d' image/casper/filesystem.manifest-desktop
+        sudo sed -i '/laptop-detect/d' image/casper/filesystem.manifest-desktop
+        sudo sed -i '/os-prober/d' image/casper/filesystem.manifest-desktop
 
-                wget --progress=dot https://www.memtest86.com/downloads/memtest86-usb.zip -O image/install/memtest86-usb.zip
+    - name: Configure ISOLINUX
+      run: |
+        cd $HOME/live-ubuntu-from-scratch
+        cat <<EOF> image/isolinux/isolinux.cfg
+        UI vesamenu.c32
+        MENU TITLE Boot Menu
+        DEFAULT linux
+        TIMEOUT 600
+        MENU RESOLUTION 640 480
+        MENU COLOR border       30;44   #40ffffff #a0000000 std
+        MENU COLOR title        1;36;44 #9033ccff #a0000000 std
+        MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
+        MENU COLOR unsel        37;44   #50ffffff #a0000000 std
+        MENU COLOR help         37;40   #c0ffffff #a0000000 std
+        MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std
+        MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std
+        MENU COLOR msg07        37;40   #90ffffff #a0000000 std
+        MENU COLOR tabmsg       31;40   #30ffffff #00000000 std
+        LABEL linux
+          MENU LABEL Try Ubuntu FS
+          MENU DEFAULT
+          KERNEL /casper/vmlinuz
+          APPEND initrd=/casper/initrd boot=casper
+        LABEL linux
+          MENU LABEL Try Ubuntu FS (nomodeset)
+          KERNEL /casper/vmlinuz
+          APPEND initrd=/casper/initrd boot=casper nomodeset
+        EOF
 
-                unzip -p image/install/memtest86-usb.zip memtest86-usb.img > image/install/memtest86
+        cp /usr/lib/ISOLINUX/isolinux.bin image/isolinux/
+        cp /usr/lib/syslinux/modules/bios/* image/isolinux/
 
-                rm -f image/install/memtest86-usb.zip
+    - name: Build ISO Image
+      run: |
+        cd $HOME/live-ubuntu-from-scratch
+        sudo xorriso \
+          -as mkisofs \
+          -iso-level 3 \
+          -full-iso9660-filenames \
+          -volid "UBUNTU_FS" \
+          -output ubuntu-fs.iso \
+          -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
+          -eltorito-boot isolinux/isolinux.bin \
+          -eltorito-catalog isolinux/boot.cat \
+          -no-emul-boot \
+          -boot-load-size 4 \
+          -boot-info-table \
+          -eltorito-alt-boot \
+          -e boot/grub/efi.img \
+          -no-emul-boot \
+          -isohybrid-gpt-basdat \
+          -append_partition 2 0xef image/efi.img \
+          image
 
-                cd $HOME/live-ubuntu-from-scratch
-
-                touch image/ubuntu
-
-                cat <<EOF > image/isolinux/grub.cfg
-
-                search --set=root --file /ubuntu
-
-                insmod all_video
-
-                set default="0"
-                set timeout=30
-
-                 "Try Ubuntu FS without installing" {
-                   linux /casper/vmlinuz boot=casper nopersistent toram quiet splash ---
-                   initrd /casper/initrd
-                }
-
-                menuentry "Install Ubuntu FS" {
-                   linux /casper/vmlinuz boot=casper only-ubiquity quiet splash ---
-                   initrd /casper/initrd
-                }
-
-                menuentry "Check disc for defects" {
-                   linux /casper/vmlinuz boot=casper integrity-check quiet splash ---
-                   initrd /casper/initrd
-                }
-
-                menuentry "Test memory Memtest86+ (BIOS)" {
-                   linux16 /install/memtest86+
-                }
-
-                menuentry "Test memory Memtest86 (UEFI, long load time)" {
-                   insmod part_gpt
-                   insmod search_fs_uuid
-                   insmod chain
-                   loopback loop /install/memtest86
-                   chainloader (loop,gpt1)/efi/boot/BOOTX64.efi
-                }
-                EOF
-
-                cd $HOME/live-ubuntu-from-scratch
-
-                sudo chroot chroot dpkg-query -W --showformat='${Package} ${Version}\n' | sudo tee image/casper/filesystem.manifest
-
-                sudo cp -v image/casper/filesystem.manifest image/casper/filesystem.manifest-desktop
-
-                sudo sed -i '/ubiquity/d' image/casper/filesystem.manifest-desktop
-
-                sudo sed -i '/casper/d' image/casper/filesystem.manifest-desktop
-
-                sudo sed -i '/discover/d' image/casper/filesystem.manifest-desktop
-
-                sudo sed -i '/laptop-detect/d' image/casper/filesystem.manifest-desktop
-
-                sudo sed -i '/os-prober/d' image/casper/filesystem.manifest-desktop
-
-                cat <<EOF> isolinux/isolinux.cfg
-                UI vesamenu.c32
-
-                MENU TITLE Boot Menu
-                DEFAULT linux
-                TIMEOUT 600
-                MENU RESOLUTION 640 480
-                MENU COLOR border       30;44   #40ffffff #a0000000 std
-                MENU COLOR title        1;36;44 #9033ccff #a0000000 std
-                MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
-                MENU COLOR unsel        37;44   #50ffffff #a0000000 std
-                MENU COLOR help         37;40   #c0ffffff #a0000000 std
-                MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std
-                MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std
-                MENU COLOR msg07        37;40   #90ffffff #a0000000 std
-                MENU COLOR tabmsg       31;40   #30ffffff #00000000 std
-
-                LABEL linux
-                 MENU LABEL Try Ubuntu FS
-                 MENU DEFAULT
-                 KERNEL /casper/vmlinuz
-                 APPEND initrd=/casper/initrd boot=casper
-
-                LABEL linux
-                 MENU LABEL Try Ubuntu FS (nomodeset)
-                 MENU DEFAULT
-                 KERNEL /casper/vmlinuz
-                 APPEND initrd=/casper/initrd boot=casper nomodeset
-                EOF
-
-                apt install -y syslinux-common && \
-                cp /usr/lib/ISOLINUX/isolinux.bin isolinux/ && \
-                cp /usr/lib/syslinux/modules/bios/* isolinux/
-
-                sudo xorriso \
-                  -as mkisofs \
-                     -iso-level 3 \
-                     -full-iso9660-filenames \
-                     -volid "Ubuntu from scratch" \
-                     -output "../ubuntu-from-scratch.iso" \
-                   -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-                   -eltorito-boot \
-                       isolinux/isolinux.bin \
-                       -no-emul-boot \
-                       -boot-load-size 4 \
-                       -boot-info-table \
-                       --eltorito-catalog isolinux/isolinux.cat \
-                   -eltorito-alt-boot \
-                       -e /EFI/boot/efiboot.img \
-                       -no-emul-boot \
-                       -isohybrid-gpt-basdat \
-                   -append_partition 2 0xef EFI/boot/efiboot.img \
-                    "$HOME/live-ubuntu-from-scratch/image"
-         
-    - name: Upload ISO as artifact
+    - name: Upload ISO Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ubuntu-from-scratch-iso
-        path: $HOME/ubuntu-from-scratch.iso
+        name: ubuntu-fs.iso
+        path: $HOME/live-ubuntu-from-scratch/ubuntu-fs.iso
