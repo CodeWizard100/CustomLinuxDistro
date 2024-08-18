@@ -98,6 +98,17 @@ jobs:
         cd $HOME/live-ubuntu-from-scratch
         mkdir -p image/{casper,isolinux,install}
 
+        # Check for kernel and initrd files
+        if [ ! "$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')" ]; then
+          echo "Error: Kernel file not found in chroot/boot."
+          exit 1
+        fi
+
+        if [ ! "$(ls chroot/boot | grep -Eo 'initrd.img-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')" ]; then
+          echo "Error: Initrd file not found in chroot/boot."
+          exit 1
+        fi
+
         KERNEL_VERSION=$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
         INITRD_VERSION=$(ls chroot/boot | grep -Eo 'initrd.img-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
 
@@ -106,8 +117,17 @@ jobs:
 
         sudo cp chroot/boot/memtest86+.bin image/install/memtest86+
 
-        wget --progress=dot https://www.memtest86.com/downloads/memtest86-usb.zip -O image/install/memtest86-usb.zip
-        unzip -p image/install/memtest86-usb.zip memtest86-usb.img > image/install/memtest86
+        # Download Memtest86
+        if ! wget --progress=dot https://www.memtest86.com/downloads/memtest86-usb.zip -O image/install/memtest86-usb.zip; then
+          echo "Error: Failed to download Memtest86."
+          exit 1
+        fi
+
+        if ! unzip -p image/install/memtest86-usb.zip memtest86-usb.img > image/install/memtest86; then
+          echo "Error: Failed to extract Memtest86."
+          exit 1
+        fi
+        
         rm -f image/install/memtest86-usb.zip
 
     - name: Configure GRUB
@@ -158,31 +178,27 @@ jobs:
       run: |
         cd $HOME/live-ubuntu-from-scratch
         cat <<EOF> image/isolinux/isolinux.cfg
-        UI vesamenu.c32
-        MENU TITLE Boot Menu
-        DEFAULT linux
-        TIMEOUT 600
-        MENU RESOLUTION 640 480
-        MENU COLOR border       30;44   #40ffffff #a0000000 std
-        MENU COLOR title        1;36;44 #9033ccff #a0000000 std
-        MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
-        MENU COLOR unsel        37;44   #50ffffff #a0000000 std
-        MENU COLOR help         37;40   #c0ffffff #a0000000 std
-        MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std
-        MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std
-        MENU COLOR msg07        37;40   #90ffffff #a0000000 std
-        MENU COLOR tabmsg       31;40   #30ffffff #00000000 std
-
-        LABEL linux
-         MENU LABEL Try Ubuntu FS
-         MENU DEFAULT
-         KERNEL /casper/vmlinuz
-         APPEND initrd=/casper/initrd boot=casper
-
-        LABEL linux
-         MENU LABEL Try Ubuntu FS (nomodeset)
-         KERNEL /casper/vmlinuz
-         APPEND initrd=/casper/initrd boot=casper nomodeset
+        UI menu.c32
+        PROMPT 0
+        MENU TITLE Ubuntu FS Live
+        TIMEOUT 300
+        TOTALTIMEOUT 6000
+        DEFAULT ubuntu-fs-live
+        LABEL ubuntu-fs-live
+          MENU LABEL Try Ubuntu FS without installing
+          KERNEL /casper/vmlinuz
+          APPEND initrd=/casper/initrd boot=casper nopersistent toram quiet splash ---
+        LABEL ubuntu-fs-install
+          MENU LABEL Install Ubuntu FS
+          KERNEL /casper/vmlinuz
+          APPEND initrd=/casper/initrd boot=casper only-ubiquity quiet splash ---
+        LABEL check
+          MENU LABEL Check disc for defects
+          KERNEL /casper/vmlinuz
+          APPEND initrd=/casper/initrd boot=casper integrity-check quiet splash ---
+        LABEL memtest
+          MENU LABEL Test memory Memtest86+ (BIOS)
+          KERNEL /install/memtest86+
         EOF
 
     - name: Build ISO Image
