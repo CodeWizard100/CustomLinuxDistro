@@ -16,7 +16,7 @@ jobs:
     - name: Set up Build Environment
       run: |
         sudo apt update
-        sudo apt install -y debootstrap mkisofs
+        sudo apt install -y debootstrap mkisofs isolinux
 
     - name: Bootstrap the Base System
       run: |
@@ -51,6 +51,12 @@ jobs:
         sudo umount $HOME/custom-distro/rootfs/sys
         sudo umount $HOME/custom-distro/rootfs/dev/pts
         sudo umount $HOME/custom-distro/rootfs/dev
+
+    - name: Prepare Bootloader Files
+      run: |
+        mkdir -p $HOME/custom-distro/isolinux
+        sudo cp /usr/lib/syslinux/isolinux.bin $HOME/custom-distro/isolinux/
+        sudo cp /usr/lib/syslinux/isolinux.cfg $HOME/custom-distro/isolinux/
 
     - name: Create ISO Image
       run: |
