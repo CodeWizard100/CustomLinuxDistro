@@ -26,4 +26,13 @@ jobs:
         sudo sh build.sh
         ls
 
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.8
+      with:
+
+          name: ISO
+
+          path: custom-ubuntu.iso
+            
+
   
