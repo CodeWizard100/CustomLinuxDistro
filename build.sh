@@ -5,6 +5,8 @@ arch=${1:-amd64}
 mirror=${2:-"http://archive.ubuntu.com/ubuntu/"}
 release=${3:-xenial}
 
+
+
 # Install necessary package and run debootstrap
 sudo apt-get install -y debootstrap
 sudo debootstrap --arch=${arch} ${release} chroot ${mirror}
@@ -55,6 +57,23 @@ REMOVE='ubiquity ubiquity-frontend-gtk ubiquity-frontend-kde casper lupin-casper
 for i in $REMOVE; do
     sudo sed -i "/${i}/d" image/casper/filesystem.manifest-desktop
 done
+
+sudo apt-get install -y syslinux
+
+# Create the isolinux directory
+mkdir -p image/isolinux
+
+# Copy isolinux.bin and other necessary files
+sudo cp /usr/lib/ISOLINUX/isolinux.bin image/isolinux/
+sudo cp /usr/lib/syslinux/modules/bios/* image/isolinux/
+
+# Create a basic isolinux.cfg file if it doesn't exist
+cat <<EOF | sudo tee image/isolinux/isolinux.cfg
+DEFAULT linux
+LABEL linux
+  KERNEL /casper/vmlinuz
+  APPEND initrd=/casper/initrd.lz boot=casper quiet splash ---
+EOF
 
 # Compress the filesystem
 sudo mksquashfs chroot image/casper/filesystem.squashfs -noappend -no-progress
