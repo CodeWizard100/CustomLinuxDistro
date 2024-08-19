@@ -36,7 +36,7 @@ jobs:
         
         sudo chroot custom_distro/chroot /bin/bash -c "
           apt-get update &&
-          apt-get install -y linux-generic casper lupin-casper discover laptop-detect os-prober grub-efi-amd64 grub-pc-bin grub2-common
+          apt-get install -y linux-generic casper lupin-casper laptop-detect os-prober grub-efi-amd64 grub-pc-bin grub2-common
         "
 
         sudo chroot custom_distro/chroot grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot --removable
