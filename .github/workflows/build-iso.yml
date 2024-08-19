@@ -1,71 +1,109 @@
-name: Build Custom Linux Distro
+name: Build Custom Ubuntu ISO
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build:
+  build_iso:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
-    - name: Install Dependencies
+    - name: Set up dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap grub-pc-bin grub-efi-amd64-bin xorriso mtools
+        sudo apt-get install -y binutils debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools unzip
 
-    - name: Create Root Filesystem
+    - name: Set up chroot environment
       run: |
-        mkdir -p custom_distro/chroot
-        sudo debootstrap --arch=amd64 focal custom_distro/chroot http://archive.ubuntu.com/ubuntu/
+        sudo debootstrap --arch=amd64 --variant=minbase focal custom_distro/chroot http://archive.ubuntu.com/ubuntu/
+
+    - name: Configure and install packages in chroot
+      run: |
         sudo mount --bind /dev custom_distro/chroot/dev
-        sudo mount --bind /proc custom_distro/chroot/proc
-        sudo mount --bind /sys custom_distro/chroot/sys
-
-    - name: Configure the Chroot Environment
-      run: |
-        sudo cp /etc/resolv.conf custom_distro/chroot/etc/
+        sudo mount --bind /run custom_distro/chroot/run
+        sudo chroot custom_distro/chroot mount none -t proc /proc
+        sudo chroot custom_distro/chroot mount none -t sysfs /sys
+        sudo chroot custom_distro/chroot mount none -t devpts /dev/pts
+        
         sudo chroot custom_distro/chroot /bin/bash -c "
           apt-get update &&
-          apt-get install -y ubuntu-desktop gnome-shell gdm3 &&
-          apt-get install -y python3 python3-tk &&
-          echo 'python3 /hello_world.py' >> /etc/rc.local &&
-          chmod +x /etc/rc.local
+          apt-get install -y linux-generic casper lupin-casper discover laptop-detect os-prober grub-efi-amd64 grub-pc-bin grub2-common
         "
 
-    - name: Add Custom Python Script
+        sudo chroot custom_distro/chroot grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot --removable
+
+        sudo umount custom_distro/chroot/proc
+        sudo umount custom_distro/chroot/sys
+        sudo umount custom_distro/chroot/dev/pts
+        sudo umount custom_distro/chroot/dev
+        sudo umount custom_distro/chroot/run
+
+    - name: Create ISO image
       run: |
-        echo 'import tkinter as tk' > custom_distro/chroot/hello_world.py
-        echo 'root = tk.Tk()' >> custom_distro/chroot/hello_world.py
-        echo 'root.geometry("600x400")' >> custom_distro/chroot/hello_world.py
-        echo 'label = tk.Label(root, text="Hello, World!")' >> custom_distro/chroot/hello_world.py
-        echo 'label.pack(pady=20)' >> custom_distro/chroot/hello_world.py
-        echo 'root.mainloop()' >> custom_distro/chroot/hello_world.py
+        mkdir -p custom_distro/iso/{casper,isolinux,install}
+        sudo cp custom_distro/chroot/boot/vmlinuz-*-generic custom_distro/iso/casper/vmlinuz
+        sudo cp custom_distro/chroot/boot/initrd.img-*-generic custom_distro/iso/casper/initrd
 
-    - name: Configure GRUB for BIOS and UEFI
-      run: |
-        sudo chroot custom_distro/chroot /bin/bash -c "
-          apt-get update &&
-          apt-get install -y grub-pc grub-efi-amd64 &&
-          mkdir -p /boot/grub &&
-          grub-install --target=i386-pc --boot-directory=/boot /dev/sda &&
-          grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu
-        "
+        touch custom_distro/iso/ubuntu
+        cat <<EOF > custom_distro/iso/isolinux/grub.cfg
+        search --set=root --file /ubuntu
 
-    - name: Create Bootable ISO with grub-mkrescue
-      run: |
-        sudo mkdir -p custom_distro/chroot/boot/grub
-        sudo cp -r custom_distro/chroot/boot custom_distro/iso_boot
+        insmod all_video
 
-        # Create the ISO using grub-mkrescue
-        sudo grub-mkrescue -o /tmp/custom_linux.iso custom_distro/iso_boot
+        set default="0"
+        set timeout=30
 
-    - name: Upload ISO as Artifact
-      uses: actions/upload-artifact@v2
+        menuentry "Try Ubuntu without installing" {
+          linux /casper/vmlinuz boot=casper nopersistent toram quiet splash ---
+          initrd /casper/initrd
+        }
+
+        menuentry "Install Ubuntu" {
+          linux /casper/vmlinuz boot=casper only-ubiquity quiet splash ---
+          initrd /casper/initrd
+        }
+
+        menuentry "Check disc for defects" {
+          linux /casper/vmlinuz boot=casper integrity-check quiet splash ---
+          initrd /casper/initrd
+        }
+
+        menuentry "Test memory" {
+          linux16 /install/memtest86+
+        }
+EOF
+
+        sudo mksquashfs custom_distro/chroot custom_distro/iso/casper/filesystem.squashfs -noappend -e boot
+
+        printf $(sudo du -sx --block-size=1 custom_distro/chroot | cut -f1) > custom_distro/iso/casper/filesystem.size
+
+        sudo xorriso \
+          -as mkisofs \
+          -iso-level 3 \
+          -full-iso9660-filenames \
+          -volid "CustomUbuntu" \
+          -eltorito-boot isolinux/isolinux.bin \
+          -no-emul-boot \
+          -boot-load-size 4 \
+          -boot-info-table \
+          --eltorito-catalog isolinux/boot.cat \
+          --grub2-boot-info \
+          --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img \
+          -output custom_distro.iso \
+          -m "isolinux/efiboot.img" \
+          -m "isolinux/bios.img" \
+          custom_distro/iso
+
+    - name: Upload ISO Artifact
+      uses: actions/upload-artifact@v3
       with:
-        name: custom-linux-iso
-        path: /tmp/custom_linux.iso
+        name: custom-ubuntu.iso
+        path: custom_distro.iso
