@@ -83,10 +83,11 @@ jobs:
         # Exclude virtual filesystems and use rsync to copy files
         sudo rsync -a --exclude={/dev/**,/proc/**,/sys/**,/boot/efi/**} custom_distro/chroot/ custom_distro/iso/
         
-        # Generate the ISO image
+        # Generate the ISO image with -joliet-long option
         sudo mkisofs -o /tmp/custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
-          -no-emul-boot -boot-load-size 4 -boot-info-table -J -R -V "Custom Linux" \
+          -no-emul-boot -boot-load-size 4 -boot-info-table -J -joliet-long -R -V "Custom Linux" \
           custom_distro/iso
+
 
     - name: Upload ISO as Artifact
       uses: actions/upload-artifact@v2
