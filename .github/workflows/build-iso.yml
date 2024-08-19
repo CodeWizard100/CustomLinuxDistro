@@ -60,9 +60,9 @@ jobs:
 
     - name: Create ISO Image
       run: |
-        mkdir -p custom_distro/iso/boot/grub
-        cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
-        rsync -a --exclude=/boot/efi custom_distro/chroot/ custom_distro/iso/
+        sudo mkdir -p custom_distro/iso/boot/grub
+        sudo cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
+        sudo rsync -a --exclude=/boot/efi custom_distro/chroot/ custom_distro/iso/
         sudo genisoimage -o custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
           -no-emul-boot -boot-load-size 4 -boot-info-table -J -R -V "Custom Linux" \
           custom_distro/iso
