@@ -46,19 +46,31 @@ jobs:
         echo 'label.pack(pady=20)' >> custom_distro/chroot/hello_world.py
         echo 'root.mainloop()' >> custom_distro/chroot/hello_world.py
 
-    - name: Configure GRUB
+    - name: Configure GRUB for BIOS
       run: |
         sudo chroot custom_distro/chroot /bin/bash -c "
-          apt-get install -y grub-efi-amd64
-          grub-install --target=i386-pc --boot-directory=/boot /dev/loop0
+          apt-get update &&
+          apt-get install -y grub-pc &&
+          mkdir -p /boot/grub &&
+          grub-install --root-directory=/ --boot-directory=/boot /dev/sda &&
+          grub-mkconfig -o /boot/grub/grub.cfg
+        "
+
+    - name: Configure GRUB for UEFI
+      run: |
+        sudo chroot custom_distro/chroot /bin/bash -c "
+          apt-get update &&
+          apt-get install -y grub-efi-amd64 &&
+          mkdir -p /boot/efi &&
+          grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu &&
           grub-mkconfig -o /boot/grub/grub.cfg
         "
 
     - name: Create ISO Image
       run: |
         mkdir -p custom_distro/iso/boot/grub
-        sudo cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/grub.cfg
-        sudo cp -r custom_distro/chroot/* custom_distro/iso/
+        cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
+        rsync -a --exclude=/boot/efi custom_distro/chroot/ custom_distro/iso/
         sudo genisoimage -o custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
           -no-emul-boot -boot-load-size 4 -boot-info-table -J -R -V "Custom Linux" \
           custom_distro/iso
