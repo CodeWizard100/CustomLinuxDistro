@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap mkisofs squashfs-tools xorriso mtools grub-pc-bin grub-efi-amd64-bin
+        sudo apt-get install -y debootstrap grub-pc-bin grub-efi-amd64-bin xorriso mtools
 
     - name: Create Root Filesystem
       run: |
@@ -46,48 +46,23 @@ jobs:
         echo 'label.pack(pady=20)' >> custom_distro/chroot/hello_world.py
         echo 'root.mainloop()' >> custom_distro/chroot/hello_world.py
 
-    - name: Configure GRUB for BIOS
+    - name: Configure GRUB for BIOS and UEFI
       run: |
         sudo chroot custom_distro/chroot /bin/bash -c "
           apt-get update &&
-          apt-get install -y grub-pc &&
+          apt-get install -y grub-pc grub-efi-amd64 &&
           mkdir -p /boot/grub &&
-          grub-install --root-directory=/ --boot-directory=/boot /dev/sda &&
-          grub-mkconfig -o /boot/grub/grub.cfg
+          grub-install --target=i386-pc --boot-directory=/boot /dev/sda &&
+          grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu
         "
 
-    - name: Configure GRUB for UEFI
+    - name: Create Bootable ISO with grub-mkrescue
       run: |
-        # Mount EFI partition
-        sudo mkdir -p custom_distro/chroot/boot/efi
-        # For demonstration, using a dummy mount point, adjust this based on actual setup
-        # In a real scenario, you'd have an actual EFI partition mounted here
-        sudo mount --bind /boot/efi custom_distro/chroot/boot/efi
+        sudo mkdir -p custom_distro/chroot/boot/grub
+        sudo cp -r custom_distro/chroot/boot custom_distro/iso_boot
 
-        # Run GRUB installation
-        sudo chroot custom_distro/chroot /bin/bash -c "
-          apt-get update &&
-          apt-get install -y grub-efi-amd64 &&
-          grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu &&
-          grub-mkconfig -o /boot/grub/grub.cfg
-        "
-
-    - name: Create ISO Image
-      run: |
-        # Create necessary directories
-        mkdir -p custom_distro/iso/boot/grub
-        
-        # Copy GRUB configuration
-        cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
-        
-        # Exclude virtual filesystems and use rsync to copy files
-        sudo rsync -a --exclude={/dev/**,/proc/**,/sys/**,/boot/efi/**} custom_distro/chroot/ custom_distro/iso/
-        
-        # Generate the ISO image with -joliet-long option
-        sudo mkisofs -o /tmp/custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
-          -no-emul-boot -boot-load-size 4 -boot-info-table -J -joliet-long -R -V "Custom Linux" \
-          custom_distro/iso
-
+        # Create the ISO using grub-mkrescue
+        sudo grub-mkrescue -o /tmp/custom_linux.iso custom_distro/iso_boot
 
     - name: Upload ISO as Artifact
       uses: actions/upload-artifact@v2
