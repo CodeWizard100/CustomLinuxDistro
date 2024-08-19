@@ -1,4 +1,4 @@
-name: Build Custom Distro
+name: Build Custom Linux Distro
 
 on:
   push:
@@ -10,211 +10,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-    - name: Set up Build Environment
+    - name: Install Dependencies
       run: |
-        mkdir $HOME/live-ubuntu-from-scratch
         sudo apt-get update
-        sudo apt-get install -y \
-          binutils \
-          debootstrap \
-          squashfs-tools \
-          xorriso \
-          grub-pc-bin \
-          grub-efi-amd64-bin \
-          mtools \
-          syslinux-common
+        sudo apt-get install -y debootstrap genisoimage squashfs-tools xorriso mtools grub-pc-bin grub-efi-amd64-bin
 
-    - name: Bootstrap the Base System
+    - name: Create Root Filesystem
       run: |
-        sudo debootstrap \
-          --arch=amd64 \
-          --variant=minbase \
-          focal \
-          $HOME/live-ubuntu-from-scratch/chroot \
-          http://us.archive.ubuntu.com/ubuntu/
+        mkdir -p custom_distro/chroot
+        sudo debootstrap --arch=amd64 focal custom_distro/chroot http://archive.ubuntu.com/ubuntu/
+        sudo mount --bind /dev custom_distro/chroot/dev
+        sudo mount --bind /proc custom_distro/chroot/proc
+        sudo mount --bind /sys custom_distro/chroot/sys
 
-        sudo mount --bind /dev $HOME/live-ubuntu-from-scratch/chroot/dev
-        sudo mount --bind /run $HOME/live-ubuntu-from-scratch/chroot/run
-        sudo mount none -t proc $HOME/live-ubuntu-from-scratch/chroot/proc
-        sudo mount none -t sysfs $HOME/live-ubuntu-from-scratch/chroot/sys
-        sudo mount none -t devpts $HOME/live-ubuntu-from-scratch/chroot/dev/pts
-        
-        sudo chroot $HOME/live-ubuntu-from-scratch/chroot /bin/bash -c "
-          export HOME=/root
-          export LC_ALL=C
-          echo 'ubuntu-fs-live' > /etc/hostname
-          cat <<EOF > /etc/apt/sources.list
-          deb http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
-          deb-src http://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
-          deb http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
-          deb-src http://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
-          deb http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
-          deb-src http://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
-          EOF
-          apt-get update
-          apt-get install -y libterm-readline-gnu-perl systemd-sysv
-          dbus-uuidgen > /etc/machine-id
-          ln -fs /etc/machine-id /var/lib/dbus/machine-id
-          dpkg-divert --local --rename --add /sbin/initctl
-          ln -s /bin/true /sbin/initctl
-          apt-get -y upgrade
-          apt-get install -y sudo ubuntu-standard casper lupin-casper discover laptop-detect os-prober network-manager resolvconf net-tools wireless-tools wpagui locales grub-common grub-gfxpayload-lists grub-pc grub-pc-bin grub2-common
-          apt-get install -y --no-install-recommends linux-generic
-          apt-get install -y ubiquity ubiquity-casper ubiquity-frontend-gtk ubiquity-slideshow-ubuntu ubiquity-ubuntu-artwork
-          apt-get install -y plymouth-theme-ubuntu-logo ubuntu-gnome-desktop ubuntu-gnome-wallpapers
-          apt-get install -y clamav-daemon terminator apt-transport-https curl vim nano less
-          apt-get purge -y transmission-gtk transmission-common gnome-mahjongg gnome-mines gnome-sudoku aisleriot hitori
-          apt-get autoremove -y
-          dpkg-reconfigure locales
-          dpkg-reconfigure resolvconf
-          cat <<EOF > /etc/NetworkManager/NetworkManager.conf
-          [main]
-          rc-manager=resolvconf
-          plugins=ifupdown,keyfile
-          dns=dnsmasq
-          [ifupdown]
-          managed=false
-          EOF
-          dpkg-reconfigure network-manager
-          truncate -s 0 /etc/machine-id
-          rm /sbin/initctl
-          dpkg-divert --rename --remove /sbin/initctl
-          apt-get clean
-          rm -rf /tmp/* ~/.bash_history
-          umount /proc
-          umount /sys
-          umount /dev/pts
-          exit
+    - name: Configure the Chroot Environment
+      run: |
+        sudo cp /etc/resolv.conf custom_distro/chroot/etc/
+        sudo chroot custom_distro/chroot /bin/bash -c "
+          apt-get update &&
+          apt-get install -y ubuntu-desktop gnome-shell gdm3 &&
+          apt-get install -y python3 python3-tk google-chrome-stable &&
+          echo 'python3 /hello_world.py' >> /etc/rc.local &&
+          chmod +x /etc/rc.local
         "
 
-        sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/dev
-        sudo umount -l $HOME/live-ubuntu-from-scratch/chroot/run
-
-      - name: Create ISO Structure
+    - name: Add Custom Python Script
       run: |
-        cd $HOME/live-ubuntu-from-scratch
-        mkdir -p image/{casper,isolinux,install}
-
-        # Debugging: Check contents of /boot and installed kernels
-        echo "Listing contents of /boot in chroot:"
-        ls -la $HOME/live-ubuntu-from-scratch/chroot/boot
-
-        echo "Checking installed kernel versions in chroot:"
-        sudo chroot $HOME/live-ubuntu-from-scratch/chroot dpkg -l | grep linux-image
-
-        # Check for kernel and initrd files
-        if [ ! "$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')" ]; then
-          echo "Error: Kernel file not found in chroot/boot."
-          exit 1
-        fi
-
-        if [ ! "$(ls chroot/boot | grep -Eo 'initrd.img-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')" ]; then
-          echo "Error: Initrd file not found in chroot/boot."
-          exit 1
-        fi
-
-        KERNEL_VERSION=$(ls chroot/boot | grep -Eo 'vmlinuz-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
-        INITRD_VERSION=$(ls chroot/boot | grep -Eo 'initrd.img-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic')
-
-        sudo cp "chroot/boot/${KERNEL_VERSION}" image/casper/vmlinuz
-        sudo cp "chroot/boot/${INITRD_VERSION}" image/casper/initrd
-
-        sudo cp chroot/boot/memtest86+.bin image/install/memtest86+
-
-        # Download Memtest86
-        if ! wget --progress=dot https://www.memtest86.com/downloads/memtest86-usb.zip -O image/install/memtest86-usb.zip; then
-          echo "Error: Failed to download Memtest86."
-          exit 1
-        fi
-
-        if ! unzip -p image/install/memtest86-usb.zip memtest86-usb.img > image/install/memtest86; then
-          echo "Error: Failed to extract Memtest86."
-          exit 1
-        fi
-        
-        rm -f image/install/memtest86-usb.zip
+        echo 'import tkinter as tk' > custom_distro/chroot/hello_world.py
+        echo 'root = tk.Tk()' >> custom_distro/chroot/hello_world.py
+        echo 'root.geometry("600x400")' >> custom_distro/chroot/hello_world.py
+        echo 'label = tk.Label(root, text="Hello, World!")' >> custom_distro/chroot/hello_world.py
+        echo 'label.pack(pady=20)' >> custom_distro/chroot/hello_world.py
+        echo 'root.mainloop()' >> custom_distro/chroot/hello_world.py
 
     - name: Configure GRUB
       run: |
-        cd $HOME/live-ubuntu-from-scratch
-        touch image/ubuntu
-        cat <<EOF > image/isolinux/grub.cfg
-        search --set=root --file /ubuntu
-        insmod all_video
-        set default="0"
-        set timeout=30
-        menuentry "Try Ubuntu FS without installing" {
-          linux /casper/vmlinuz boot=casper nopersistent toram quiet splash ---
-          initrd /casper/initrd
-        }
-        menuentry "Install Ubuntu FS" {
-          linux /casper/vmlinuz boot=casper only-ubiquity quiet splash ---
-          initrd /casper/initrd
-        }
-        menuentry "Check disc for defects" {
-          linux /casper/vmlinuz boot=casper integrity-check quiet splash ---
-          initrd /casper/initrd
-        }
-        menuentry "Test memory Memtest86+ (BIOS)" {
-          linux16 /install/memtest86+
-        }
-        menuentry "Test memory Memtest86 (UEFI, long load time)" {
-          insmod part_gpt
-          insmod search_fs_uuid
-          insmod chain
-          loopback loop /install/memtest86
-          chainloader (loop,gpt1)/efi/boot/BOOTX64.efi
-        }
-        EOF
+        sudo chroot custom_distro/chroot /bin/bash -c "
+          apt-get install -y grub2
+          grub-install --target=i386-pc --boot-directory=/boot /dev/loop0
+          grub-mkconfig -o /boot/grub/grub.cfg
+        "
 
-    - name: Generate Manifest
+    - name: Create ISO Image
       run: |
-        cd $HOME/live-ubuntu-from-scratch
-        sudo chroot chroot dpkg-query -W --showformat='${Package} ${Version}\n' | sudo tee image/casper/filesystem.manifest
-        sudo cp -v image/casper/filesystem.manifest image/casper/filesystem.manifest-desktop
-        sudo sed -i '/ubiquity/d' image/casper/filesystem.manifest-desktop
-        sudo sed -i '/casper/d' image/casper/filesystem.manifest-desktop
-        sudo sed -i '/discover/d' image/casper/filesystem.manifest-desktop
-        sudo sed -i '/laptop-detect/d' image/casper/filesystem.manifest-desktop
-        sudo sed -i '/os-prober/d' image/casper/filesystem.manifest-desktop
+        mkdir -p custom_distro/iso/boot/grub
+        sudo cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/grub.cfg
+        sudo cp -r custom_distro/chroot/* custom_distro/iso/
+        sudo genisoimage -o custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
+          -no-emul-boot -boot-load-size 4 -boot-info-table -J -R -V "Custom Linux" \
+          custom_distro/iso
 
-    - name: Configure ISOLINUX
-      run: |
-        cd $HOME/live-ubuntu-from-scratch
-        cat <<EOF> image/isolinux/isolinux.cfg
-        UI menu.c32
-        PROMPT 0
-        MENU TITLE Ubuntu FS Live
-        TIMEOUT 300
-        TOTALTIMEOUT 6000
-        DEFAULT ubuntu-fs-live
-        LABEL ubuntu-fs-live
-          MENU LABEL Try Ubuntu FS without installing
-          KERNEL /casper/vmlinuz
-          APPEND initrd=/casper/initrd boot=casper nopersistent toram quiet splash ---
-        LABEL ubuntu-fs-install
-          MENU LABEL Install Ubuntu FS
-          KERNEL /casper/vmlinuz
-          APPEND initrd=/casper/initrd boot=casper only-ubiquity quiet splash ---
-        LABEL check
-          MENU LABEL Check disc for defects
-          KERNEL /casper/vmlinuz
-          APPEND initrd=/casper/initrd boot=casper integrity-check quiet splash ---
-        LABEL memtest
-          MENU LABEL Test memory Memtest86+ (BIOS)
-          KERNEL /install/memtest86+
-        EOF
-
-    - name: Build ISO Image
-      run: |
-        cd $HOME/live-ubuntu-from-scratch
-        sudo xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "UBUNTU_FS" -output ubuntu-fs.iso -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -eltorito-boot isolinux/isolinux.bin -eltorito-catalog isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -append_partition 2 0xef image/efi.img image
-
-    - name: Upload ISO Artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload ISO as Artifact
+      uses: actions/upload-artifact@v2
       with:
-        name: ubuntu-fs.iso
-        path: $HOME/live-ubuntu-from-scratch/ubuntu-fs.iso
+        name: custom-linux-iso
+        path: custom_linux.iso
