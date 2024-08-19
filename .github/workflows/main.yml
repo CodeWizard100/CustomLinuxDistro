@@ -23,11 +23,11 @@ jobs:
 
     - name: Set up chroot environment
       run: |
+        sudo mkdir custom_distro
         sudo debootstrap --arch=amd64 --variant=minbase focal custom_distro/chroot http://archive.ubuntu.com/ubuntu/
 
     - name: Configure and install packages in chroot
       run: |
-        sudo mkdir custom_distro
         sudo mount --bind /dev custom_distro/chroot/dev
         sudo mount --bind /run custom_distro/chroot/run
         sudo chroot custom_distro/chroot mount none -t proc /proc
