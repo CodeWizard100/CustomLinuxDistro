@@ -79,7 +79,7 @@ jobs:
         menuentry "Test memory" {
           linux16 /install/memtest86+
         }
-EOF
+        EOF
 
         sudo mksquashfs custom_distro/chroot custom_distro/iso/casper/filesystem.squashfs -noappend -e boot
 
