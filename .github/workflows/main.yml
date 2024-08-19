@@ -23,7 +23,7 @@ jobs:
 
     - name: Set up chroot environment
       run: |
-        sudo sh run.sh
+        sudo sh build.sh
         ls
 
   
