@@ -16,7 +16,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap genisoimage squashfs-tools xorriso mtools grub-pc-bin grub-efi-amd64-bin
+        sudo apt-get install -y debootstrap mkisofs squashfs-tools xorriso mtools grub-pc-bin grub-efi-amd64-bin
 
     - name: Create Root Filesystem
       run: |
@@ -56,14 +56,29 @@ jobs:
           grub-mkconfig -o /boot/grub/grub.cfg
         "
 
-
+    - name: Configure GRUB for UEFI
+      run: |
+        sudo chroot custom_distro/chroot /bin/bash -c "
+          apt-get update &&
+          apt-get install -y grub-efi-amd64 &&
+          mkdir -p /boot/efi &&
+          grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu &&
+          grub-mkconfig -o /boot/grub/grub.cfg
+        "
 
     - name: Create ISO Image
       run: |
-        sudo mkdir -p custom_distro/iso/boot/grub
-        sudo cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
-        sudo rsync -a --exclude=/boot/efi custom_distro/chroot/ custom_distro/iso/
-        sudo genisoimage -o custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
+        # Create necessary directories
+        mkdir -p custom_distro/iso/boot/grub
+        
+        # Copy GRUB configuration
+        cp custom_distro/chroot/boot/grub/grub.cfg custom_distro/iso/boot/grub/
+        
+        # Exclude virtual filesystems and use rsync to copy files
+        sudo rsync -a --exclude={/dev/**,/proc/**,/sys/**,/boot/efi/**} custom_distro/chroot/ custom_distro/iso/
+        
+        # Generate the ISO image
+        sudo mkisofs -o /tmp/custom_linux.iso -b boot/grub/i386-pc/eltorito.img \
           -no-emul-boot -boot-load-size 4 -boot-info-table -J -R -V "Custom Linux" \
           custom_distro/iso
 
@@ -71,4 +86,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: custom-linux-iso
-        path: custom_linux.iso
+        path: /tmp/custom_linux.iso
