@@ -5,10 +5,15 @@ arch=${1:-amd64}
 mirror=${2:-"http://archive.ubuntu.com/ubuntu/"}
 release=${3:-xenial}
 
+# Install necessary packages
+sudo apt-get update
+sudo apt-get install -y debootstrap squashfs-tools xorriso syslinux isolinux genisoimage
 
+# Create necessary directories
+mkdir -p image/isolinux
+mkdir -p chroot
 
-# Install necessary package and run debootstrap
-sudo apt-get install -y debootstrap
+# Run debootstrap
 sudo debootstrap --arch=${arch} ${release} chroot ${mirror}
 
 # Copy sources.list
@@ -45,9 +50,9 @@ exit
 EOF
 
 # Copy required files
-tar xf image-amd64.tar.lzma
-sudo \cp --verbose -rf chroot/boot/vmlinuz-**-generic image/casper/vmlinuz
-sudo \cp --verbose -rf chroot/boot/initrd.img-**-generic image/casper/initrd.lz
+sudo tar xf image-amd64.tar.lzma -C image/
+sudo cp --verbose -rf chroot/boot/vmlinuz-**-generic image/casper/vmlinuz
+sudo cp --verbose -rf chroot/boot/initrd.img-**-generic image/casper/initrd.lz
 
 # Create manifest
 sudo chroot chroot dpkg-query -W --showformat='${Package} ${Version}\n' | sudo tee image/casper/filesystem.manifest
@@ -58,16 +63,11 @@ for i in $REMOVE; do
     sudo sed -i "/${i}/d" image/casper/filesystem.manifest-desktop
 done
 
-sudo apt-get install -y syslinux
-
-# Create the isolinux directory
-mkdir -p image/isolinux
-
 # Copy isolinux.bin and other necessary files
 sudo cp /usr/lib/ISOLINUX/isolinux.bin image/isolinux/
 sudo cp /usr/lib/syslinux/modules/bios/* image/isolinux/
 
-# Create a basic isolinux.cfg file if it doesn't exist
+# Create a basic isolinux.cfg file
 cat <<EOF | sudo tee image/isolinux/isolinux.cfg
 DEFAULT linux
 LABEL linux
@@ -81,7 +81,6 @@ sudo mksquashfs chroot image/casper/filesystem.squashfs -noappend -no-progress
 # Create ISO image
 IMAGE_NAME=${IMAGE_NAME:-"CUSTOM ${release} $(date -u +%Y%m%d) - ${arch}"}
 ISOFILE="custom-ubuntu.iso"
-sudo apt-get install -y genisoimage
 
 # Generate the ISO
 sudo genisoimage -r -V "$IMAGE_NAME" -cache-inodes -J -l \
@@ -90,4 +89,4 @@ sudo genisoimage -r -V "$IMAGE_NAME" -cache-inodes -J -l \
     -no-emul-boot -boot-load-size 4 -boot-info-table \
     -p "${DEBFULLNAME:-$USER} <${DEBMAIL:-on host $(hostname --fqdn)}>" \
     -A "$IMAGE_NAME" \
-    -o ../$ISOFILE .
+    -o $ISOFILE image/
