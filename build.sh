@@ -51,8 +51,8 @@ EOF
 
 # Copy required files
 sudo tar xf image-amd64.tar.lzma -C image/
-sudo cp --verbose -rf chroot/boot/vmlinuz-**-generic image/casper/vmlinuz
-sudo cp --verbose -rf chroot/boot/initrd.img-**-generic image/casper/initrd.lz
+sudo cp --verbose -rf chroot/boot/vmlinuz-* image/casper/vmlinuz
+sudo cp --verbose -rf chroot/boot/initrd.img-* image/casper/initrd.lz
 
 # Create manifest
 sudo chroot chroot dpkg-query -W --showformat='${Package} ${Version}\n' | sudo tee image/casper/filesystem.manifest
@@ -77,6 +77,7 @@ EOF
 
 # Compress the filesystem
 sudo mksquashfs chroot image/casper/filesystem.squashfs -noappend -no-progress
+ls -lh image/casper/filesystem.squashfs
 
 # Create ISO image
 IMAGE_NAME=${IMAGE_NAME:-"CUSTOM ${release} $(date -u +%Y%m%d) - ${arch}"}
@@ -90,3 +91,6 @@ sudo genisoimage -r -V "$IMAGE_NAME" -cache-inodes -J -l \
     -p "${DEBFULLNAME:-$USER} <${DEBMAIL:-on host $(hostname --fqdn)}>" \
     -A "$IMAGE_NAME" \
     -o $ISOFILE image/
+
+# Check ISO size
+ls -lh $ISOFILE
