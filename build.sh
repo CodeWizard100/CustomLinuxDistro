@@ -17,6 +17,14 @@ mkdir -p chroot
 sudo debootstrap --arch=${arch} ${release} chroot ${mirror}
 
 # Copy sources.list
+cat <<EOF > sources.${release}.list
+deb ${mirror} ${release} main restricted universe multiverse
+deb ${mirror} ${release}-updates main restricted universe multiverse
+deb ${mirror} ${release}-security main restricted universe multiverse
+deb ${mirror} ${release}-backports main restricted universe multiverse
+EOF
+
+# Copy sources.list to chroot environment
 sudo cp -v sources.${release}.list chroot/etc/apt/sources.list
 
 # Mount filesystem to chroot
